@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sentiment Alpha Trader</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00ff88;
+    --accent2: #7b61ff;
+    --red: #ff4567;
+    --yellow: #ffd166;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --font-mono: 'Space Mono', monospace;
+    --font-display: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* grid noise texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.4rem;
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--accent); }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* KPI row */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0.6;
+  }
+  .kpi-card.red::after { background: var(--red); }
+  .kpi-card.purple::after { background: var(--accent2); }
+  .kpi-card.yellow::after { background: var(--yellow); }
+
+  .kpi-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  .kpi-value {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .kpi-value.positive { color: var(--accent); }
+  .kpi-value.negative { color: var(--red); }
+  .kpi-sub {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* Main layout */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .panel-badge {
+    font-size: 0.62rem;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: var(--surface2);
+    color: var(--accent);
+    border: 1px solid rgba(0,255,136,0.2);
+  }
+
+  /* Equity chart */
+  .chart-area {
+    padding: 20px;
+    height: 240px;
+    position: relative;
+  }
+
+  svg.equity-chart {
+    width: 100%; height: 100%;
+    overflow: visible;
+  }
+
+  /* Signal table */
+  .signal-scroll { max-height: 500px; overflow-y: auto; }
+  .signal-scroll::-webkit-scrollbar { width: 4px; }
+  .signal-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    background: var(--surface2);
+    position: sticky; top: 0;
+  }
+  td { padding: 10px 16px; border-bottom: 1px solid rgba(42,42,58,0.5); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .badge-long  { background: rgba(0,255,136,0.12); color: var(--accent);  border: 1px solid rgba(0,255,136,0.25); }
+  .badge-short { background: rgba(255,69,103,0.12); color: var(--red);    border: 1px solid rgba(255,69,103,0.25); }
+  .badge-flat  { background: rgba(107,107,128,0.12); color: var(--muted); border: 1px solid rgba(107,107,128,0.2); }
+
+  /* Sentiment bar */
+  .sent-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .sent-bar-bg {
+    flex: 1; height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  .sent-bar-fill {
+    position: absolute;
+    top: 0; height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .sent-bar-fill.positive { background: var(--accent); right: 50%; }
+  .sent-bar-fill.negative { background: var(--red);    left: 50%; }
+
+  /* Activity feed */
+  .feed { padding: 12px 0; }
+  .feed-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(42,42,58,0.4);
+    font-size: 0.72rem;
+  }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-time { color: var(--muted); flex-shrink: 0; width: 55px; }
+  .feed-text { color: var(--text); line-height: 1.4; }
+  .feed-text b { color: var(--accent); font-weight: 700; }
+  .feed-text .red { color: var(--red); }
+
+  /* Bottom row */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* Score sparklines */
+  .ticker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(42,42,58,0.4);
+    font-size: 0.73rem;
+  }
+  .ticker-row:last-child { border-bottom: none; }
+  .ticker-symbol { font-weight: 700; width: 60px; color: var(--text); }
+  .ticker-score {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  /* Run button */
+  .run-btn {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 10px 22px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .run-btn:hover { background: #00e87a; transform: translateY(-1px); }
+  .run-btn:active { transform: translateY(0); }
+
+  .mode-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--surface2);
+    border-radius: 5px;
+    padding: 3px;
+  }
+  .mode-btn {
+    padding: 5px 14px;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    background: transparent;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+  .mode-btn.active {
+    background: var(--surface);
+    color: var(--accent);
+    border: 1px solid rgba(0,255,136,0.2);
+  }
+
+  @media (max-width: 1000px) {
+    .kpi-row { grid-template-columns: repeat(2,1fr); }
+    .main-grid { grid-template-columns: 1fr; }
+    .bottom-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">SENTIMENT<span>α</span></div>
+    <div class="status-bar">
+      <div class="status-dot"></div>
+      <span id="clock">--:-- ET</span>
+      <span id="market-status">PAPER TRADING</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div class="mode-toggle">
+        <button class="mode-btn active" onclick="setMode('dry')">Dry Run</button>
+        <button class="mode-btn" onclick="setMode('live')">Live</button>
+        <button class="mode-btn" onclick="setMode('backtest')">Backtest</button>
+      </div>
+      <button class="run-btn" onclick="runPipeline()">▶ Run Now</button>
+    </div>
+  </header>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Portfolio Value</div>
+      <div class="kpi-value positive" id="kpi-equity">$100,000</div>
+      <div class="kpi-sub" id="kpi-equity-sub">paper account</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Today's P&L</div>
+      <div class="kpi-value positive" id="kpi-pnl">+$0.00</div>
+      <div class="kpi-sub" id="kpi-pnl-sub">0 trades today</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Sharpe (sim)</div>
+      <div class="kpi-value" id="kpi-sharpe" style="color:var(--yellow)">0.00</div>
+      <div class="kpi-sub">annualized</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Max Drawdown</div>
+      <div class="kpi-value negative" id="kpi-dd">0.00%</div>
+      <div class="kpi-sub">from peak</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="main-grid">
+
+    <!-- Equity curve -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Equity Curve</span>
+        <span class="panel-badge" id="curve-label">Simulated</span>
+      </div>
+      <div class="chart-area">
+        <svg class="equity-chart" id="equity-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00ff88" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#00ff88" stop-opacity="0.0"/>
+            </linearGradient>
+          </defs>
+          <path id="equity-fill" fill="url(#lineGrad)" stroke="none"/>
+          <path id="equity-line" fill="none" stroke="#00ff88" stroke-width="2"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Signals panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Today's Signals</span>
+        <span class="panel-badge" id="sig-count">0 active</span>
+      </div>
+      <div class="signal-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Score</th>
+              <th>Signal</th>
+              <th>Articles</th>
+            </tr>
+          </thead>
+          <tbody id="signal-table-body">
+            <tr><td colspan="4" style="color:var(--muted);text-align:center;padding:30px;">
+              Press ▶ Run Now to generate signals
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom grid -->
+  <div class="bottom-grid">
+
+    <!-- Activity log -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Activity Log</span>
+        <button onclick="clearLog()" style="background:none;border:none;color:var(--muted);font-size:0.65rem;cursor:pointer;font-family:var(--font-mono)">CLEAR</button>
+      </div>
+      <div class="feed" id="activity-feed">
+        <div class="feed-item">
+          <span class="feed-time">--:--</span>
+          <span class="feed-text">System ready. Configure <b>.env</b> and run pipeline.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top movers -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Sentiment Scores</span>
+        <span class="panel-badge">Last Run</span>
+      </div>
+      <div id="score-list">
+        <div style="color:var(--muted);text-align:center;padding:30px;font-size:0.72rem;">
+          No data yet
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let mode = 'dry';
+let equityHistory = [100000];
+let runCount = 0;
+
+// ── Clock ─────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const h = String(et.getHours()).padStart(2,'0');
+  const m = String(et.getMinutes()).padStart(2,'0');
+  const s = String(et.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s} ET`;
+
+  const day = et.getDay();
+  const hour = et.getHours();
+  const isMarketHours = day >= 1 && day <= 5 && hour >= 9 && hour < 16;
+  const mStatus = document.getElementById('market-status');
+  mStatus.textContent = isMarketHours ? 'MARKET OPEN' : 'MARKET CLOSED';
+  mStatus.style.color = isMarketHours ? 'var(--accent)' : 'var(--muted)';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Mode toggle ───────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['dry','live','backtest'][i] === m);
+  });
+}
+
+// ── Simulated pipeline run ────────────────────────────────────────────────
+const UNIVERSE = ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','JPM',
+  'V','UNH','JNJ','XOM','WMT','PG','MA','HD','CVX','MRK','ABBV','PEP'];
+
+function simulateSentiment() {
+  return UNIVERSE.map(t => ({
+    ticker: t,
+    score: +(Math.random() * 1.4 - 0.7).toFixed(3),
+    n_articles: Math.floor(Math.random() * 18) + 2,
+  }));
+}
+
+function getSignal(score, n) {
+  if (n < 2) return 'FLAT';
+  if (score >= 0.35) return 'LONG';
+  if (score <= -0.35) return 'SHORT';
+  return 'FLAT';
+}
+
+function runPipeline() {
+  runCount++;
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+
+  addLog(timeStr, `Running <b>${mode.toUpperCase()}</b> pipeline — scoring ${UNIVERSE.length} tickers...`);
+
+  setTimeout(() => {
+    const sentData = simulateSentiment();
+    sentData.sort((a,b) => Math.abs(b.score) - Math.abs(a.score));
+
+    // signals
+    const signals = sentData.map(r => ({ ...r, signal: getSignal(r.score, r.n_articles) }));
+    const active = signals.filter(r => r.signal !== 'FLAT').slice(0, 10);
+
+    updateSignalTable(signals);
+    updateScoreList(sentData.slice(0, 10));
+
+    const longs = active.filter(r => r.signal === 'LONG').length;
+    const shorts = active.filter(r => r.signal === 'SHORT').length;
+    document.getElementById('sig-count').textContent = `${active.length} active`;
+
+    addLog(timeStr, `FinBERT complete. <b>${longs} LONG</b>, <span class="red">${shorts} SHORT</span>, ${UNIVERSE.length - longs - shorts} FLAT`);
+
+    // simulate P&L
+    const dayReturn = (Math.random() * 0.04 - 0.015);
+    const lastEquity = equityHistory[equityHistory.length - 1];
+    const newEquity = lastEquity * (1 + dayReturn);
+    equityHistory.push(newEquity);
+
+    const pnl = newEquity - lastEquity;
+    document.getElementById('kpi-equity').textContent = '$' + newEquity.toLocaleString('en-US',{maximumFractionDigits:0});
+    document.getElementById('kpi-pnl').textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toLocaleString('en-US',{maximumFractionDigits:0});
+    document.getElementById('kpi-pnl').className = 'kpi-value ' + (pnl >= 0 ? 'positive' : 'negative');
+    document.getElementById('kpi-pnl-sub').textContent = `${active.length} trades today`;
+
+    // sharpe / dd
+    const returns = [];
+    for (let i = 1; i < equityHistory.length; i++) returns.push(equityHistory[i]/equityHistory[i-1]-1);
+    if (returns.length > 1) {
+      const mean = returns.reduce((a,b)=>a+b,0)/returns.length;
+      const std  = Math.sqrt(returns.map(r=>(r-mean)**2).reduce((a,b)=>a+b,0)/returns.length);
+      const sharpe = std > 0 ? ((mean*252)/(std*Math.sqrt(252))).toFixed(2) : '0.00';
+      document.getElementById('kpi-sharpe').textContent = sharpe;
+    }
+
+    let peak = 0, maxDD = 0;
+    for (const v of equityHistory) {
+      if (v > peak) peak = v;
+      const dd = (v - peak) / peak;
+      if (dd < maxDD) maxDD = dd;
+    }
+    document.getElementById('kpi-dd').textContent = (maxDD * 100).toFixed(2) + '%';
+
+    drawEquityCurve();
+
+    if (mode === 'live') {
+      setTimeout(() => {
+        addLog(timeStr, `Orders submitted to Alpaca. Check your paper account.`);
+      }, 800);
+    } else if (mode === 'dry') {
+      addLog(timeStr, `[Dry run] ${active.length} orders printed — no execution.`);
+    }
+  }, 900);
+}
+
+// ── Signal table ──────────────────────────────────────────────────────────
+function updateSignalTable(signals) {
+  const tbody = document.getElementById('signal-table-body');
+  tbody.innerHTML = signals.map(r => {
+    const badgeClass = r.signal === 'LONG' ? 'badge-long' : r.signal === 'SHORT' ? 'badge-short' : 'badge-flat';
+    const scoreColor = r.score > 0.35 ? 'var(--accent)' : r.score < -0.35 ? 'var(--red)' : 'var(--text)';
+    const barPct = Math.abs(r.score) / 1.0 * 50;
+    const barClass = r.score >= 0 ? 'positive' : 'negative';
+    return `<tr>
+      <td style="font-weight:700">${r.ticker}</td>
+      <td>
+        <div class="sent-bar-wrap">
+          <span style="color:${scoreColor};min-width:50px">${r.score > 0 ? '+' : ''}${r.score}</span>
+          <div class="sent-bar-bg">
+            <div class="sent-bar-fill ${barClass}" style="width:${barPct}%"></div>
+          </div>
+        </div>
+      </td>
+      <td><span class="badge ${badgeClass}">${r.signal}</span></td>
+      <td style="color:var(--muted)">${r.n_articles}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Score list ────────────────────────────────────────────────────────────
+function updateScoreList(data) {
+  document.getElementById('score-list').innerHTML = data.map(r => {
+    const color = r.score > 0.35 ? 'var(--accent)' : r.score < -0.35 ? 'var(--red)' : 'var(--muted)';
+    const barW = Math.abs(r.score / 0.7) * 100;
+    return `<div class="ticker-row">
+      <span class="ticker-symbol">${r.ticker}</span>
+      <div class="sent-bar-bg" style="flex:1;margin:0 12px">
+        <div class="sent-bar-fill ${r.score >= 0 ? 'positive' : 'negative'}" style="width:${Math.min(barW,100)}%"></div>
+      </div>
+      <span class="ticker-score" style="color:${color}">${r.score > 0 ? '+' : ''}${r.score}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Equity curve ──────────────────────────────────────────────────────────
+function drawEquityCurve() {
+  const data = equityHistory;
+  if (data.length < 2) return;
+
+  const W = 800, H = 200, PAD = 10;
+  const min = Math.min(...data) * 0.999;
+  const max = Math.max(...data) * 1.001;
+
+  const xScale = i => PAD + (i / (data.length - 1)) * (W - 2*PAD);
+  const yScale = v => H - PAD - ((v - min) / (max - min)) * (H - 2*PAD);
+
+  const pts = data.map((v, i) => `${xScale(i)},${yScale(v)}`).join(' ');
+  const lineD = `M ${pts.split(' ').join(' L ')}`;
+  const fillD = `${lineD} L ${xScale(data.length-1)},${H} L ${xScale(0)},${H} Z`;
+
+  document.getElementById('equity-line').setAttribute('d', lineD);
+  document.getElementById('equity-fill').setAttribute('d', fillD);
+}
+
+// ── Activity log ──────────────────────────────────────────────────────────
+function addLog(time, text) {
+  const feed = document.getElementById('activity-feed');
+  const item = document.createElement('div');
+  item.className = 'feed-item';
+  item.innerHTML = `<span class="feed-time">${time}</span><span class="feed-text">${text}</span>`;
+  feed.insertBefore(item, feed.firstChild);
+  if (feed.children.length > 20) feed.removeChild(feed.lastChild);
+}
+
+function clearLog() {
+  document.getElementById('activity-feed').innerHTML = '';
+}
+
+// init curve
+drawEquityCurve();
+</script>
+</body>
+</html>
