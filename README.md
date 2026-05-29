@@ -2,8 +2,6 @@
 
 A systematic **long/short equity trading system** that uses NLP to find alpha in financial news. Every morning before market open, it scores news headlines for 25 S&P 100 stocks using **FinBERT** (a finance-trained BERT model), generates buy/sell signals, and executes trades automatically via the **Alpaca brokerage API**.
 
-![Backtest Results](results/backtest_results.png)
-
 ---
 
 ## What It Does
